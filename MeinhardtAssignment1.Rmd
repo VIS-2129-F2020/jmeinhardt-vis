@@ -1,0 +1,75 @@
+---
+title: "Assignment 1: Identifying a Dataset "
+author: "Julia Meinhardt"
+date: "9/7/2020"
+output: html_document
+---
+```{r load libraries, results='hide', message=FALSE}
+library(tidycensus)
+library(tidyverse)
+```
+
+## Choosing Variables
+
+This dataset was compiled from person-level data from the 2018 ACS and will be used to explore the adult female population in Montana and possible relationships between receiving public or government assistance and other variables like age, income, and education. My interest stems from my upbringing in a rural area, education in Montana, and desire to inquire into the use of public assistance by females in this rural state. 
+
+
+## Process
+
+To explore available variables, I first loaded person-level data. 
+
+```{r load person-level variables }
+person_vars_acs1 <- load_variables(2018, "acs1")
+```
+
+Next, I chose the following set of variables: 
+
+1. Age - AGEP (continuous)
+2. Hours worked/week - WKHP (continuous)
+3. Income - WAGP (continuous)
+4. Public assistance income - PAP (continuous)
+5. Medicare, Medicaid, or any government assistance - HINS4 (categorical)
+6. Educational attainment - SCHL (categorical)
+7. Sex - SEX (categorical) *Note: sex is used to define the sample population. 
+
+Then I loaded the variables into a dataframe, pulling only obvservations from Montana and for women over the age of 18. 
+
+```{r load person-level data, results='hide', message=FALSE}
+MTperson_data <- get_pums(variables = c("AGEP", 
+                                  "WKHP", 
+                                  "WAGP",
+                                  "HINS4",
+                                  "PAP", 
+                                  "SEX",
+                                  "SCHL"),
+                        state = "MT", 
+                        year = 2018, 
+                        survey = "acs1",
+                        recode = TRUE) %>%
+  filter(AGEP > 18, SEX == 2) %>%
+  select(AGEP, WKHP, WAGP, HINS4_label, PAP, SCHL_label, SEX_label)
+
+```
+
+The resulting dataframe consists of 4,036 observations and is shown below. 
+
+```{r show person-level data}
+MTperson_data
+```
+
+Lastly, I saved the dataframe as a CSV file.
+
+```{r save as .csv}
+write_csv(MTperson_data, "montanafemalepop.csv")
+```
+
+## Summary 
+
+1. Unit of analysis: person
+2. Definition of sample population: adult women in the state of Montana
+3. Variables: Age, hours of work/week, public assistance income, medicare, medicaid, or government assistance, education
+4. The number of observations (rows) in dataset: 4,036
+
+
+
+

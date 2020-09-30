@@ -1,0 +1,321 @@
+---
+title: 'Assignment 3: Areas and Locations'
+author: "Julia Meinhardt"
+date: "9/25/2020"
+output: 
+  html_document:
+        toc: true
+        toc_float: true
+        code_folding: hide 
+---
+## Setup
+```{r setup, include=FALSE}
+library(sf)
+library(tidyverse)
+library(ggthemes)
+library(ggspatial)
+library(units)
+library(nngeo)
+```
+
+
+### Point Data
+1. Trees maintained by the City of Sacramento
+2. Locations of Lost or Found Animals (as of September 25, 2020)
+
+### Polygon Data
+3. Neighborhoods
+4. Parks 
+
+```{r loading points and polygons}
+sactrees <- st_read("https://opendata.arcgis.com/datasets/b9b716e09b5048179ab648bb4518452b_0.kml", 
+                  quiet = TRUE)
+
+sacparks <- st_read("https://opendata.arcgis.com/datasets/b3047674f3f04a759c484fe5208faf6c_0.kml", quiet = TRUE)
+ 
+sacneighborhoods <- st_read("https://opendata.arcgis.com/datasets/49f20f1612ae4f0a9292eb65f8bd4013_0.kml", quiet = TRUE)
+
+sacanimals <- st_read("https://opendata.arcgis.com/datasets/f21c251fcb544ab497976dcb3460e93c_0.kml", quiet = TRUE)
+
+```
+
+```{r coordinate system and data trasnform}
+california_albers <- ("+proj=aea +lat_1=34 +lat_2=40.5 +lat_0=0 +lon_0=-120 +x_0=0 +y_0=-4000000 +ellps=GRS80 +datum=NAD83 +units=m +no_defs")
+
+sactrees<- sactrees %>%
+  st_transform(california_albers)
+
+sacparks<- sacparks %>%
+  st_transform(california_albers)
+
+sacneighborhoods<- sacneighborhoods %>%
+  st_transform(california_albers)
+
+sacanimals<- sacanimals %>%
+  st_transform(california_albers)
+
+```
+
+##  Data Visualized
+
+This map shows public parks (light green) within the city of Sacramento, publicly maintained trees (dark green), neighborhoods (outlined in grey) and the locations where animals have been reported to be lost or found within Sacramento and the surrounding area. This dataset is updated daily, and I believe only includes animals that are currently still reported as lost or within the system as found and waiting to be returned/find new homes.
+
+
+```{r, fig.height=4}
+sacmap <-ggplot() +
+  geom_sf(data = sacneighborhoods,  fill = "NA", color = "black") +
+  geom_sf(data = sacparks, color = "lightgreen", fill = "lightgreen") +
+  geom_sf(data = sactrees, color = "darkgreen", alpha = 0.04, fill = "NA", size = 0.03) +
+  geom_sf(data = sacanimals, fill = "NA", color = "orange", size = 0.5) +
+  theme_map() +
+  annotation_scale()
+
+sacmap
+```
+
+## Buffers and Subsets 
+
+### Figure 1: Animals Lost and Found around Parks
+
+I'm going to create a buffer around parks. I'm choosing 100 meters to include a fairly wide area around all of the public parks in Sacramento. This way we can visualize the pets found in/near parks.
+
+```{r buffer around parks}
+parks_buffer <- st_buffer(sacparks, dist = 200) %>%
+  st_union()
+
+ggplot(parks_buffer) +
+  geom_sf() +
+  theme_map()
+```
+
+```{r animals in parks}
+animals_parks <- sacanimals[parks_buffer,]
+  
+ggplot(parks_buffer) +
+  geom_sf() +
+  geom_sf(data = animals_parks, 
+          color = "red", 
+          size = 0.5) +
+  theme_map()
+```
+```{r join animals with buffer}
+sacanimals <- sacanimals %>%  
+  st_join(animals_parks) %>%
+  mutate(by_park = !is.na(Name.y))%>%
+  st_intersection()
+  
+```
+
+
+
+```{r sum animals in parks}
+n_parks_animals <- sum(sacanimals$by_park)
+
+n_parks_animals
+```
+
+```{r percent animals parks}
+n_animals <- length(sacanimals$by_park) 
+
+pct_animals_parks <- (n_parks_animals / n_animals) 
+
+pct_animals_parks
+```
+About 20% of lost and found animals currently in the City of Sacramento's database are either lost or found within 200 meters of a public park!
+
+
+```{r, fig.height=6}
+
+left_side  <- st_bbox(sacanimals)$xmin
+top_side <- st_bbox(sacanimals)$ymax
+
+ggplot(sacneighborhoods) +
+  geom_sf(fill = "NA", color = "black") +
+   geom_sf(data = sacparks, color = "NA", fill = "lightgreen") +
+  geom_sf(data = sacanimals, size = 1,
+          aes(color = by_park)) +
+  scale_color_manual(values = c("grey", "red"),
+          name = "Sacramento Lost/Found Animals by Distance from Park", 
+          labels = c("No park within 200 meters",
+                     "Park within 200 m")) +
+  annotation_scale(location = "br") +
+  annotate(geom = "text", x = left_side, 
+           y = top_side, 
+           label = paste("Of the ", 
+                         prettyNum(n_animals, big.mark = ","),
+                         " cats and dogs reported to Animal Care Services in Sacramento, \n", 
+                         prettyNum(n_parks_animals, big.mark = ","),
+                         " (", 
+                         prettyNum(100*pct_animals_parks, digits = 0),
+                         "%) were lost or found within 200 meters of a public park within the city.",
+                         sep = ""),
+           hjust = 0, vjust = 1, size = 5) +
+  theme_map() +
+  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+### Figure 2: Trees around Public Parks
+
+```{r buffer around parks, trees}
+parks_buffer <- st_buffer(sacparks, dist = 200) %>%
+  st_union()
+
+ggplot(parks_buffer) +
+  geom_sf() +
+  theme_map()
+```
+
+```{r trees in buffer}
+trees_parks <- sactrees[parks_buffer,]
+  
+ggplot(parks_buffer) +
+  geom_sf() +
+  geom_sf(data = trees_parks, 
+          color = "darkgreen", 
+          size = 0.01) +
+  theme_map()
+```
+
+```{r trees join }
+sactrees <- sactrees %>%
+  st_join(trees_parks) %>%
+  mutate(by_park = !is.na(Name.y))
+
+```
+
+```{r number of trees by parks}
+n_parks_trees <- sum(sactrees$by_park)
+
+n_parks_trees
+```
+There are 52,219 publicly maintained trees found within 200 meters of a public park in Sacramento. 
+
+```{r percent of trees around parks}
+n_trees <- length(sactrees$by_park) 
+
+pct_trees_parks <- (n_parks_trees / n_trees) 
+
+pct_trees_parks
+```
+51% of publicly maintained trees in Sacramento are within 200 meters of a public park!
+
+```{r trees and parks, fig.height=7}
+
+left_side  <- st_bbox(sacanimals)$xmin
+top_side <- st_bbox(sacanimals)$ymax
+
+ggplot(sacneighborhoods) +
+  geom_sf(fill = "NA", color = "black") +
+  geom_sf(data = sacparks, color = "lightgreen", fill = "lightgreen") +
+  geom_sf(data = sactrees, size = 0.1,
+          aes(color = by_park)) +
+  scale_color_manual(values = c("grey", "darkgreen"),
+          name = "Sacramento Trees by Distance from Parks", 
+          labels = c("No park within 200 meters",
+                     "Park within 200 m")) +
+  annotation_scale(location = "br") +
+  annotate(geom = "text", x = left_side, 
+           y = top_side, 
+           label = paste("Of the ", 
+                         prettyNum(n_trees, big.mark = ","),
+                         " Publicly Maintained Trees in Sacramento \n", 
+                         prettyNum(n_parks_trees, big.mark = ","),
+                         " (", 
+                         prettyNum(100*pct_trees_parks, digits = 0),
+                         "%) are within 200 meters of a public park.",
+                         sep = ""),
+           hjust = 0, vjust = 2, size = 5) +
+  theme_map() +
+  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
+
+## Points in Polygons
+
+### Figure 3: Neighborhoods by Number of Lost/Found Animals
+
+```{r neighborhoods number animals}
+sacneighborhoods <- sacneighborhoods %>%
+  mutate(num_animals = lengths(st_covers(sacneighborhoods, animals_parks)))
+
+ggplot(sacneighborhoods) +
+  geom_sf(color = NA, 
+          aes(fill = num_animals)) +
+  scale_fill_continuous_tableau(name = "Sacramento Neighborhoods by Number of Lost and Found Animals",
+                       breaks = breaks <- seq(0, 15, by = 1),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "animals")) +
+  annotation_scale(location = "br") +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))+
+  theme(legend.position = "left")
+                                     
+```
+### Figure 4: Neighborhood by Density of Lost/Found Animals
+
+```{r neighborhoods animals density}
+sacneighborhoods <- sacneighborhoods %>%
+  mutate(area = set_units(st_area(sacneighborhoods), km^2)) %>%
+  mutate(animals_dens = as.numeric(num_animals/ area))
+
+ggplot(sacneighborhoods) +
+  geom_sf(color = NA, 
+          aes(fill = animals_dens)) +
+    scale_fill_continuous_tableau(name = 
+                           "Sacramento Neighborhoods\nby Density of Lost and Found Animals",
+                       breaks = breaks <- seq(0, 10, by = 1),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "animals per km")) +
+  annotation_scale(location = "br") +
+theme_map() +
+  theme(legend.position = "right",
+    legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+
+### Figure 5: Neighborhoods by Number of Trees 
+  
+```{r trees neighborhoods }
+sacneighborhoods <- sacneighborhoods %>%
+  mutate(num_trees = lengths(st_covers(sacneighborhoods, sactrees)))
+
+ggplot(sacneighborhoods) +
+  geom_sf(color = NA, 
+          aes(fill = num_trees)) +
+  scale_fill_continuous_tableau(name = "Sacramento Neighborhoods by Number of Publicly Maintained Trees",
+                       breaks = breaks <- seq(0, 5000, by = 1000),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "trees")) +
+  annotation_scale(location = "br") +
+theme_map() +
+  theme(legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))+
+  theme(legend.position = "left")
+                                     
+```
+### Figure 6: Neighborhoods by Density of Trees
+
+The neighborhoods with higher concentrations of trees are around the capitol building and midtown Sacramento. 
+
+```{r trees neighborhood density}
+sacneighborhoods <- sacneighborhoods %>%
+  mutate(area = set_units(st_area(sacneighborhoods), km^2)) %>%
+  mutate(tree_dens = as.numeric(num_trees / area))
+
+ggplot(sacneighborhoods) +
+  geom_sf(color = NA, 
+          aes(fill = tree_dens)) +
+    scale_fill_continuous_tableau(name = 
+                           "Sacramento neighborhoods\nby tree density",
+                       breaks = breaks <- seq(0, 2000, by = 500),
+                       labels = paste(prettyNum(breaks, big.mark = ","),
+                                      "trees per square km")) +
+  annotation_scale(location = "br") +
+theme_map() +
+  theme(legend.position = "right",
+    legend.background = element_rect(fill = alpha("white", 0.5), 
+                                         color = "gray"))
+```
+

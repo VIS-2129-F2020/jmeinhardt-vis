@@ -25,6 +25,8 @@ library(wesanderson)
 
 This analysis compares walksheds and bikesheds for climbing boulders within the city of Bozeman, Montana. 
 
+**I used Mary's code to help put together my final bar chart! I learned how to create the new dataframe from her code, and she inspired me to finally try the Wes Anderson palette, which exceeded my expectations...Thanks Mary!** 
+
 
 ### Setup
 

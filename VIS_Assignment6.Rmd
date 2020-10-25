@@ -1,0 +1,86 @@
+---
+title: "Interactive Map"
+author: "Julia Meinhardt"
+date: "10/23/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(htmltools)
+library(htmlwidgets)
+library(rnaturalearth)
+```
+
+```{r}
+timber <- st_read("https://data-cdtfa.opendata.arcgis.com/datasets/7083a55396e84f76956a047ca856d6d1_0.geojson?outSR=%7B%22latestWkid%22%3A3857%2C%22wkid%22%3A102100%7D")
+```
+```{r}
+timber <- filter(timber, intCalendarYear == 2017, intNetVolBoardFeet > 0 ) 
+timber <- mutate(timber, VolMFeet = intNetVolBoardFeet/1000000)
+```
+
+```{r}
+timber$describe <- 
+  paste(timber$strCounty, "<br>", 
+               prettyNum(timber$VolMFeet), " feet") %>% 
+  lapply(htmltools::HTML)
+```
+
+
+
+
+1. Add table with values
+2. Try a green color palette?
+3. Make highlight highlight in same c
+
+
+```{r}
+bins <- c(.1, 10, 20, 50, 100, 200, 300)
+pal <- colorBin("BuGn", domain = timber$VolMFeet, bins = bins)
+```
+
+```{r}
+
+timber_map1 <- leaflet(timber, 
+                       options = leafletOptions(minZoom = 5, maxZoom = 9)) %>%
+  addProviderTiles(providers$Stamen.Terrain) %>%
+  addPolygons(fillColor = ~pal(VolMFeet),fillOpacity = 0.7, stroke = TRUE, weight = 1.5,
+              highlightOptions = highlightOptions(fillColor = "green", 
+                                                  fillOpacity = 1),
+              label = timber$FMNAME_PC,
+              popup = paste( timber$FMNAME_PC, "<br/>",
+                            "Net Board Production:", round(timber$VolMFeet),"million feet", "<br/>")) %>%
+  addControl("2017 Timber Statistics in California by County", position = "topright") %>%
+  addControl('<a href="https://data-cdtfa.opendata.arcgis.com/datasets/7083a55396e84f76956a047ca856d6d1_0.geojson?outSR=%7B%22latestWkid%22%3A3857%2C%22wkid%22%3A102100%7D">Data Source</a>',
+             position = "bottomleft") %>%
+  addLegend(pal = pal,
+             values = timber$VolMFeet,
+             title = "Net Board Production (million feet)",
+            opacity = 1) %>%
+  setMaxBounds( lng1 = -130,
+                lat1 = -45,
+                lng2 = -110,
+                lat2 = 43)
+
+timber_map1
+
+```
+
+
+
+
+label = paste("County:", timber$strCounty, "<br/>",
+                            "Net Board Feet:", timber$intNetVolBoardFeet, "<br/>")) 
+
+
+
+
+
+
+
+
+
+

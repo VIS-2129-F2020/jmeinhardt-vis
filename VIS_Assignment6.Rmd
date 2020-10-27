@@ -18,7 +18,7 @@ library(rnaturalearth)
 timber <- st_read("https://data-cdtfa.opendata.arcgis.com/datasets/7083a55396e84f76956a047ca856d6d1_0.geojson?outSR=%7B%22latestWkid%22%3A3857%2C%22wkid%22%3A102100%7D")
 ```
 ```{r}
-timber <- filter(timber, intCalendarYear == 2017, intNetVolBoardFeet > 0 ) 
+timber <- filter(timber, intCalendarYear == 2017) 
 timber <- mutate(timber, VolMFeet = intNetVolBoardFeet/1000000)
 ```
 
@@ -38,13 +38,13 @@ timber$describe <-
 
 
 ```{r}
-bins <- c(0, 10, 20, 50, 100, 200, 300)
+bins <- c(0,.01,  10, 20, 50, 100, 200, 300)
 pal <- colorBin("BuGn", domain = timber$VolMFeet, bins = bins)
 ```
 
 ```{r}
 
-timber_map1 <- leaflet(timber, 
+timber_map2 <- leaflet(timber, 
                        options = leafletOptions(minZoom = 5, maxZoom = 9)) %>%
   addProviderTiles(providers$Stamen.Terrain) %>%
   addPolygons(fillColor = ~pal(VolMFeet),fillOpacity = 0.7, stroke = TRUE, weight = 1.5,
@@ -53,8 +53,8 @@ timber_map1 <- leaflet(timber,
               label = timber$FMNAME_PC,
               popup = paste( timber$FMNAME_PC, "<br/>",
                             "Net Board Production:", (timber$VolMFeet),"million feet", "<br/>")) %>%
-  addControl("2017 Timber Statistics in California by County", position = "topright") %>%
-  addControl('<a href="https://data-cdtfa.opendata.arcgis.com/datasets/7083a55396e84f76956a047ca856d6d1_0.geojson?outSR=%7B%22latestWkid%22%3A3857%2C%22wkid%22%3A102100%7D">Data Source</a>',
+  addControl("2017 Timber Production in California by County", position = "topright") %>%
+  addControl('<a href="https://gis.data.ca.gov/datasets/7083a55396e84f76956a047ca856d6d1_0/data?geometry=-165.240%2C22.044%2C-51.333%2C46.994">Data Source</a>',
              position = "bottomleft") %>%
   addLegend(pal = pal,
              values = timber$VolMFeet,
@@ -65,12 +65,12 @@ timber_map1 <- leaflet(timber,
                 lng2 = -110,
                 lat2 = 43)
 
-timber_map1
+timber_map2
 
 ```
 
 ```{r}
-saveWidget(timber_map1, file = "timber1.html")
+saveWidget(timber_map2, file = "timber2.html")
 ```
 
 

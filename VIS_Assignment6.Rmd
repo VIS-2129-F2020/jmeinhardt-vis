@@ -38,7 +38,7 @@ timber$describe <-
 
 
 ```{r}
-bins <- c(.1, 10, 20, 50, 100, 200, 300)
+bins <- c(0, 10, 20, 50, 100, 200, 300)
 pal <- colorBin("BuGn", domain = timber$VolMFeet, bins = bins)
 ```
 
@@ -52,7 +52,7 @@ timber_map1 <- leaflet(timber,
                                                   fillOpacity = 1),
               label = timber$FMNAME_PC,
               popup = paste( timber$FMNAME_PC, "<br/>",
-                            "Net Board Production:", round(timber$VolMFeet),"million feet", "<br/>")) %>%
+                            "Net Board Production:", (timber$VolMFeet),"million feet", "<br/>")) %>%
   addControl("2017 Timber Statistics in California by County", position = "topright") %>%
   addControl('<a href="https://data-cdtfa.opendata.arcgis.com/datasets/7083a55396e84f76956a047ca856d6d1_0.geojson?outSR=%7B%22latestWkid%22%3A3857%2C%22wkid%22%3A102100%7D">Data Source</a>',
              position = "bottomleft") %>%
@@ -69,6 +69,9 @@ timber_map1
 
 ```
 
+```{r}
+saveWidget(timber_map1, file = "timber1.html")
+```
 
 
 

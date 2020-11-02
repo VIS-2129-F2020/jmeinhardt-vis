@@ -37,3 +37,9 @@ vignettes/*.pdf
 
 # R Environment Variables
 .Renviron
+
+#Downloaded spatial data
+data-downloads/
+OTP/
+rosm.cache/
+

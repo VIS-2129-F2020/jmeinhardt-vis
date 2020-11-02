@@ -1,0 +1,50 @@
+---
+title: 'Assignment 7: Raster Interpolation'
+author: "Julia Meinhardt"
+date: "11/1/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(sf)
+library(leaflet)
+library(htmltools)
+library(htmlwidgets)
+library(raster)
+library(gstat)
+library(spatial)
+```
+
+Identify an area-level data set for a single variable (might be at the neighborhood level, zip-code level, or county-level, for example) that includes at least ten different zones. Show the variable in that variable by zone (as a chloropleth map), as points (using area centroids), and as a continuous surface (interpolating between centroid points. Your submission should include a discussion of which of these three methods is (a) most informative, (b) most interesting, (c) most appropriate to the data, and (d) best.
+
+```{r}
+counties <- st_read("https://public.opendatasoft.com/explore/dataset/us-county-boundaries/download/?format=geojson&timezone=America/Los_Angeles&lang=en", quiet = TRUE) %>%
+ dplyr::select(name) 
+
+leaflet(counties) %>%
+  addProviderTiles(providers$Stamen.TonerLite) %>%
+  addPolygons(highlightOptions = highlightOptions(fillColor = "yellow", 
+                                                  fillOpacity = 1),
+                                                  label = ~name, 
+                                                  weight = 1) 
+
+
+```
+```{r}
+
+countyincome <- read.csv(file = "Income.csv")
+
+```
+
+```{r}
+countyincome <- dplyr::rename(countyincome, name = County) 
+```
+
+```{r}
+countypoverty <- dplyr::left_join(countyincome, counties, by = "name")
+```
+
+
+
+

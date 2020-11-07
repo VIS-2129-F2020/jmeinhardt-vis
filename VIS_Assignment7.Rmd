@@ -5,46 +5,104 @@ date: "11/1/2020"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
+```{r, include=FALSE}
+library(tidycensus)
 library(tidyverse)
 library(sf)
-library(leaflet)
-library(htmltools)
-library(htmlwidgets)
+library(dplyr)
+library(tidyr)
+options(tigris_use_cache = TRUE)
 library(raster)
 library(gstat)
 library(spatial)
 ```
 
-Identify an area-level data set for a single variable (might be at the neighborhood level, zip-code level, or county-level, for example) that includes at least ten different zones. Show the variable in that variable by zone (as a chloropleth map), as points (using area centroids), and as a continuous surface (interpolating between centroid points. Your submission should include a discussion of which of these three methods is (a) most informative, (b) most interesting, (c) most appropriate to the data, and (d) best.
-
 ```{r}
-counties <- st_read("https://public.opendatasoft.com/explore/dataset/us-county-boundaries/download/?format=geojson&timezone=America/Los_Angeles&lang=en", quiet = TRUE) %>%
- dplyr::select(name) 
-
-leaflet(counties) %>%
-  addProviderTiles(providers$Stamen.TonerLite) %>%
-  addPolygons(highlightOptions = highlightOptions(fillColor = "yellow", 
-                                                  fillOpacity = 1),
-                                                  label = ~name, 
-                                                  weight = 1) 
-
-
-```
-```{r}
-
-countyincome <- read.csv(file = "Income.csv")
-
+area_vars_2018 <- load_variables(2018, "acs1")
 ```
 
+
 ```{r}
-countyincome <- dplyr::rename(countyincome, name = County) 
+county_vars <- get_acs(state = "CA", geography= "county", variables = "B25035_001", geometry = TRUE) 
+```
+
+Median Year Structure Was Built
+
+```{r cloropleth}
+county_vars %>%
+  ggplot(aes(fill = estimate)) +
+  geom_sf(color = NA) +
+  coord_sf(crs = 4687) +
+  scale_fill_viridis_c(option = "magma") +
+  
+  theme_minimal()
 ```
 
 ```{r}
-countypoverty <- dplyr::left_join(countyincome, counties, by = "name")
+
+WGS84 <-  "+proj=lcc +lat_1=41.66666666666666 +lat_2=40 +lat_0=39.33333333333334 +lon_0=-122 +x_0=2000000.0001016 +y_0=500000.0001016001 +ellps=GRS80 +datum=NAD83 +to_meter=0.3048006096012192 +no_defs "
+NAD83 <- "+proj=aea +lat_1=34 +lat_2=40.5 +lat_0=0 +lon_0=-120 +x_0=0 +y_0=-4000000 +ellps=GRS80 +datum=NAD83 +units=m +no_defs "
+
+
 ```
 
+```{r}
+county_points <- st_centroid(
+  st_transform(county_vars, crs = NAD83))
+
+```
+
+
+```{r}
+  ggplot(county_points, aes()) +
+  geom_sf(data = county_vars)+
+  geom_sf(data = county_points, pch = 1, color = "red") +
+  coord_sf(crs = 4687) +
+  scale_fill_viridis_c(option = "magma") +
+  
+  theme_minimal()
+```
+
+
+
+
+```{r}
+counties_points <- county_points %>%
+  st_transform(WGS84) %>%
+  as_Spatial()
+
+counties_poly <- county_vars %>%
+  st_transform(WGS84) %>%
+  as_Spatial()
+  
+  
+```
+
+  
+```{r}
+counties_raster <- raster(counties_poly, res=20)
+```
+
+
+```{r}
+test <- gstat(formula=estimate~1, locations=counties_points)
+
+``` 
+
+```{r}
+interpol <- interpolate(final_raster, test)
+```
+```{r}
+interpol_clip<- mask(interpol, counties_poly)
+```
+
+```{r}
+ggplot() +
+  geom_raster(data = interpol_clip,
+              aes(x = x, y = y)) + 
+
+  coord_quickmap()
+```
 
 
 

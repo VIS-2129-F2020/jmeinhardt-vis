@@ -1,0 +1,207 @@
+---
+title: "Raster Interpolation"
+author: "Julia Meinhardt"
+date: "11/5/2020"
+output: html_document
+---
+
+
+```{r, include=FALSE}
+library(tidycensus)
+library(tidyverse)
+library(sf)
+library(dplyr)
+library(tidyr)
+options(tigris_use_cache = TRUE)
+library(raster)
+library(gstat)
+library(spatial)
+library(leaflet)
+library(htmltools)
+library(htmlwidgets)
+```
+
+```{r include=FALSE}
+area_vars_2018 <- load_variables(2018, "acs1")
+```
+
+
+## Credit
+
+*Huge, huge shoutout to Marissa for helping me immensely.* I had a bit of trouble with this assignment and she helped me brainstorm and tested my code for me. 
+
+## Median Year Structures Built by Tract
+
+Following Marissa's structure, I used Utah for my code as well, but explored interpolation with *tract-level* data at a statewide scale. 
+
+```{r, include=FALSE}
+county_vars <- get_acs(state = "UT", geography= "tract", variables = "B25035_001", geometry = TRUE) %>%
+  filter(estimate > 0)
+```
+
+
+```{r, include=FALSE}
+
+```
+
+```{r, include=FALSE}
+NAD83 <- "+proj=lcc +lat_1=40.65 +lat_2=39.01666666666667 +lat_0=38.33333333333334 +lon_0=-111.5 +x_0=500000.0001504 +y_0=1999999.999992 +ellps=GRS80 +datum=NAD83 +to_meter=0.3048 +no_defs"
+
+WGS84 <- "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"
+
+county_vars <- 
+  st_transform(county_vars, crs = NAD83) %>%
+  st_transform(WGS84)
+
+```
+
+```{r, echo=FALSE, include=FALSE}
+
+
+leaflet(county_vars) %>%
+  addProviderTiles(providers$Stamen.TonerLite) %>%
+  addPolygons(highlightOptions = highlightOptions(fillColor = "yellow", 
+                                                  fillOpacity = 1),
+              label = ~NAME,
+              weight = 1) 
+```
+
+### Chloropleth Map
+
+There are a few things I like about this map.
+
+First, the tract with the oldest median structure ages stands out first. With the two maps that follow, the viridis pallette, yellow dominates and pulls the eye more dramatically. 
+
+Second, it is fairly easy to read up front as far as "big picture" information.
+
+The problems are that tracts become so significantly smaller in populated areas that things get messy around urban areas. The benefit of leaflet is that one can zoom and see these spaces in more detail. 
+
+
+```{r, echo=FALSE}
+county_vars$label <- 
+  paste(county_vars$NAME, "<br>", 
+        county_vars$estimate, "Median year structures were built") %>% 
+  lapply(htmltools::HTML)
+
+bins <- seq(min(county_vars$estimate),
+            max(county_vars$estimate), by = 20)
+pal <- colorNumeric("viridis", 
+                    domain = county_vars$estimate,
+                    na.color = "#00000000")
+
+leaflet(county_vars) %>%
+  addProviderTiles(providers$Stamen.TonerLite) %>%
+  addPolygons(highlightOptions = highlightOptions(fillOpacity = 1),
+              label = ~label,
+              fillColor = ~pal(estimate),
+              weight = 1, color = "grey") %>% 
+  addLegend(pal = pal, 
+            values = ~estimate,
+            bins = 5,
+            opacity = 0.7, title = "Median year structures were built",
+            position = "topright")
+```
+
+```{r, include=FALSE}
+county_points <- st_centroid(
+  st_transform(county_vars, crs = NAD83)) %>%
+  st_transform(WGS84)
+```
+
+### Centroids
+
+The tract level doesn't work well a state view and centroids. 
+
+It is difficult to distinguish colors and they're clustered around the urban spaces, making these areas difficult to read once again. The darkest colored points are nearly impossible to pick up zoomed out. 
+
+```{r, include=FALSE}
+county_points$label <- 
+  paste(county_points$NAME, "<br>",
+        county_points$estimate, "Median year structures were built") %>% 
+  lapply(htmltools::HTML)
+
+county_points <- st_centroid(
+  st_transform(county_points, crs = NAD83)) %>%
+  st_transform(WGS84)
+```
+
+
+```{r, echo=FALSE}
+leaflet(county_points) %>%
+  addProviderTiles(providers$Stamen.TonerLite) %>%
+  addCircles(label = ~label,
+             fillColor = ~pal(estimate), 
+             stroke = FALSE, 
+             radius = 6000, 
+             fillOpacity = 1) %>% 
+   addPolylines(data = county_vars, stroke = T, 
+               color = "grey", 
+               opacity = 1,
+               weight = .75) %>%
+  addLegend(pal = pal, 
+            values = ~estimate,
+            bins = 6,
+            opacity = 0.7, title = "Median year  structures were built ",
+            position = "topright")
+```
+
+
+```{r, include=FALSE}
+county_pts_sp <- county_points %>%
+  st_transform(NAD83) %>%
+  as_Spatial()
+
+county_poly_sp <- county_vars %>%
+  st_transform(NAD83) %>%
+  as_Spatial()
+```
+
+```{r, include=FALSE}
+county_raster <- raster(county_poly_sp, res=300)
+```
+
+
+
+```{r, include=FALSE}
+gs <- gstat(formula=estimate~1, locations=county_pts_sp)
+idw_interp <- interpolate(county_raster, gs)
+
+idw_interp_clip <- mask(idw_interp, county_poly_sp)
+```
+
+### Interpolating Centroids
+
+I don't know that I would deem this map a complete success either, though there are things I like.
+
+I think this maps does well to convey, while zoomed out, which general regions of the state contain the newest development. It's easy to tell that around Salt Lake City and St. George, there are newer developments. 
+
+The deepest purple spot in the eastern side of the state stands out easily as well. 
+
+However, because this state has many large tracts that are mostly rural, the map becomes taken over by a sea of green. Perhaps a different means of binning or categorizing the data would help to reduce the predominance of these areas. 
+
+Additionally, looking at the years structures were built at this scale is probably not ideal for mostly rural states in general. Much of these spaces are private or public lands with little development. If the audience was unfamiliar with the region, they might be misled about these undeveloped areas. 
+
+
+```{r, include=FALSE}
+county_vars$label <- 
+  paste(county_vars$name, "<br>", 
+        county_vars$estimate, "Median year structures were built") %>% 
+  lapply(htmltools::HTML)
+```
+
+
+```{r, echo=FALSE}
+leaflet(county_points) %>%
+  addProviderTiles(providers$Stamen.TonerLite) %>%
+  addRasterImage(idw_interp_clip, colors = pal, opacity = 0.8) %>% 
+   addPolylines(data = county_vars, stroke = T, 
+               color = "white", 
+               opacity = 1,
+               weight = .5) %>%
+  addLegend(pal = pal, 
+            values = ~estimate,
+            bins = 5,
+            opacity = 0.7, title = "Median year structures were built ",
+            position = "topright")
+```
+

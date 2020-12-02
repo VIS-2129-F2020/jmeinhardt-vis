@@ -6,6 +6,7 @@ output: html_document
 ---
 
 ```{r, include=FALSE}
+
 library(tidycensus)
 library(tidyverse)
 library(sf)
@@ -15,6 +16,7 @@ options(tigris_use_cache = TRUE)
 library(raster)
 library(gstat)
 library(spatial)
+
 ```
 
 ```{r}
@@ -23,20 +25,22 @@ area_vars_2018 <- load_variables(2018, "acs1")
 
 
 ```{r}
-county_vars <- get_acs(state = "CA", geography= "county", variables = "B25035_001", geometry = TRUE) 
+county_vars <- get_acs( geography= "county",state = "CA", variables = "B06002_002", geometry = TRUE) 
 ```
 
-Median Year Structure Was Built
+Average age of residents *born in the state*. 
 
-```{r cloropleth}
+```{r cloropleth, fig.width=7}
 county_vars %>%
   ggplot(aes(fill = estimate)) +
   geom_sf(color = NA) +
   coord_sf(crs = 4687) +
-  scale_fill_viridis_c(option = "magma") +
+  scale_fill_viridis_c(option = "plasma") +
   
   theme_minimal()
 ```
+
+
 
 ```{r}
 
@@ -48,22 +52,20 @@ NAD83 <- "+proj=aea +lat_1=34 +lat_2=40.5 +lat_0=0 +lon_0=-120 +x_0=0 +y_0=-4000
 
 ```{r}
 county_points <- st_centroid(
-  st_transform(county_vars, crs = NAD83))
+  st_transform(county_vars, crs = NAD83))%>%
+  st_transform(WGS84)
 
 ```
 
 
 ```{r}
-  ggplot(county_points, aes()) +
+  ggplot(county_points, aes(fill = "estimate")) +
   geom_sf(data = county_vars)+
-  geom_sf(data = county_points, pch = 1, color = "red") +
+  geom_sf(data = county_points, pch = 1.) +
   coord_sf(crs = 4687) +
-  scale_fill_viridis_c(option = "magma") +
   
   theme_minimal()
 ```
-
-
 
 
 ```{r}
@@ -90,7 +92,7 @@ test <- gstat(formula=estimate~1, locations=counties_points)
 ``` 
 
 ```{r}
-interpol <- interpolate(final_raster, test)
+interpol <- interpolate(counties_raster, test)
 ```
 ```{r}
 interpol_clip<- mask(interpol, counties_poly)
